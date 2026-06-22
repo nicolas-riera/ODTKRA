@@ -10,6 +10,7 @@
 #include <iomanip>
 #include <string>
 #include <thread>
+#include <atomic>
 #include "resource.h"
 
 std::string ODTPath = "C:\\Program Files\\Meta Horizon\\Support\\oculus-diagnostics\\";
@@ -18,9 +19,8 @@ std::string ODTPath = "C:\\Program Files\\Meta Horizon\\Support\\oculus-diagnost
 #define ID_TRAY_EXIT 1001
 
 NOTIFYICONDATA nid = { 0 };
-bool running = true;
+std::atomic<bool> running(true);
 
-// system tray
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     if (uMsg == WM_TRAYICON) {
         if (lParam == WM_RBUTTONUP) {
@@ -30,6 +30,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             AppendMenu(hMenu, MF_STRING, ID_TRAY_EXIT, TEXT("Exit"));
             SetForegroundWindow(hWnd);
             TrackPopupMenu(hMenu, TPM_BOTTOMALIGN | TPM_LEFTALIGN, curPoint.x, curPoint.y, 0, hWnd, NULL);
+            PostMessage(hWnd, WM_NULL, 0, 0);
             DestroyMenu(hMenu);
         }
         else if (lParam == WM_LBUTTONDBLCLK) {
@@ -54,188 +55,188 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 }
 
 int get_pid(const std::wstring& processName) {
-	int pid = 0;
-	// Take a snapshot of all running processes
-	HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-	if (hSnapshot == INVALID_HANDLE_VALUE) {
-		std::cout << "CreateToolhelp32Snapshot failed: " << GetLastError() << std::endl;
-		return pid;
-	}
+    int pid = 0;
+    // Take a snapshot of all running processes
+    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (hSnapshot == INVALID_HANDLE_VALUE) {
+        std::cout << "CreateToolhelp32Snapshot failed: " << GetLastError() << std::endl;
+        return pid;
+    }
 
-	// Fill in the size of the structure before using it.
-	PROCESSENTRY32 pe32;
-	pe32.dwSize = sizeof(PROCESSENTRY32);
+    // Fill in the size of the structure before using it.
+    PROCESSENTRY32 pe32;
+    pe32.dwSize = sizeof(PROCESSENTRY32);
 
-	// Walk the snapshot of the processes, and for each process,
-	// display information
-	if (Process32First(hSnapshot, &pe32)) {
-		do {
-			if (processName == pe32.szExeFile) {
-				pid = pe32.th32ProcessID;
-				break;
-			}
-		} while (Process32Next(hSnapshot, &pe32));
-	}
+    // Walk the snapshot of the processes, and for each process,
+    // display information
+    if (Process32First(hSnapshot, &pe32)) {
+        do {
+            if (processName == pe32.szExeFile) {
+                pid = pe32.th32ProcessID;
+                break;
+            }
+        } while (Process32Next(hSnapshot, &pe32));
+    }
 
-	CloseHandle(hSnapshot);
-	return pid;
+    CloseHandle(hSnapshot);
+    return pid;
 }
 
 tm time_now(bool twelve_hour = true) {
-	time_t now = time(0);
-	tm ltm;
-	localtime_s(&ltm, &now);
-	if (twelve_hour = true) {
-		//convert to 12 hour format
-		if (ltm.tm_hour > 12) {
-			ltm.tm_hour -= 12;
-		}
-		else if (ltm.tm_hour == 0) {
-			ltm.tm_hour = 12;
-		}
-	}
-	return ltm;
+    time_t now = time(0);
+    tm ltm;
+    localtime_s(&ltm, &now);
+    if (twelve_hour == true) {
+        //convert to 12 hour format
+        if (ltm.tm_hour > 12) {
+            ltm.tm_hour -= 12;
+        }
+        else if (ltm.tm_hour == 0) {
+            ltm.tm_hour = 12;
+        }
+    }
+    return ltm;
 }
 
 int minutes(int minutes) {
-	return minutes * 60000;
+    return minutes * 60000;
 }
 
 int seconds(int seconds) {
-	return seconds * 1000;
+    return seconds * 1000;
 }
 
 void executed_at(std::string message = "Executed at: ") {
-	tm time = time_now();
-	std::cout << message << std::put_time(&time, "%H:%M:%S") << std::endl;
+    tm time = time_now();
+    std::cout << message << std::put_time(&time, "%H:%M:%S") << std::endl;
 }
 
 HWND get_winhandle(LPCWSTR Target_window_Name) {
-	HWND hWindowHandle = FindWindow(NULL, Target_window_Name);
-	return hWindowHandle;
+    HWND hWindowHandle = FindWindow(NULL, Target_window_Name);
+    return hWindowHandle;
 }
 
 HWND get_vxwin(HWND hWindowHandle) {
-	HWND PropertGrid = FindWindowEx(hWindowHandle, NULL, L"wxWindowNR", NULL);
-	HWND wxWindow = FindWindowEx(PropertGrid, NULL, L"wxWindow", NULL);
-	return wxWindow;
+    HWND PropertGrid = FindWindowEx(hWindowHandle, NULL, L"wxWindowNR", NULL);
+    HWND wxWindow = FindWindowEx(PropertGrid, NULL, L"wxWindow", NULL);
+    return wxWindow;
 }
 
 void forceForegroundWindow(HWND hwnd) { // https://stackoverflow.com/questions/19136365/win32-setforegroundwindow-not-working-all-the-time
-	DWORD windowThreadProcessId = GetWindowThreadProcessId(GetForegroundWindow(), LPDWORD(0));
-	DWORD currentThreadId = GetCurrentThreadId();
-	DWORD CONST_SW_SHOW = 5;
-	AttachThreadInput(windowThreadProcessId, currentThreadId, true);
-	BringWindowToTop(hwnd);
-	ShowWindow(hwnd, CONST_SW_SHOW);
-	AttachThreadInput(windowThreadProcessId, currentThreadId, false);
+    DWORD windowThreadProcessId = GetWindowThreadProcessId(GetForegroundWindow(), LPDWORD(0));
+    DWORD currentThreadId = GetCurrentThreadId();
+    DWORD CONST_SW_SHOW = 5;
+    AttachThreadInput(windowThreadProcessId, currentThreadId, true);
+    BringWindowToTop(hwnd);
+    ShowWindow(hwnd, CONST_SW_SHOW);
+    AttachThreadInput(windowThreadProcessId, currentThreadId, false);
 }
 
 void Press_key(int key, HWND wxWindow) {
-	if (wxWindow != NULL) {
-		SendMessage(wxWindow, WM_KEYDOWN, key, 0);
-		SendMessage(wxWindow, WM_KEYUP, key, 0);
-	}
-	else {
-		keybd_event(key, 0, KEYEVENTF_EXTENDEDKEY | 0, 0);
-		keybd_event(key, 0, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, 0);
-	}
+    if (wxWindow != NULL) {
+        SendMessage(wxWindow, WM_KEYDOWN, key, 0);
+        SendMessage(wxWindow, WM_KEYUP, key, 0);
+    }
+    else {
+        keybd_event(key, 0, KEYEVENTF_EXTENDEDKEY | 0, 0);
+        keybd_event(key, 0, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, 0);
+    }
 }
 
 void ODT_CLI() {
-	//Sets "set-pixels-per-display-pixel-override" to 0.01 to decrease performance overhead
-	std::string temp = "echo service set-pixels-per-display-pixel-override 0.01 | \"" + ODTPath + "OculusDebugToolCLI.exe\"";
-	system(temp.c_str());
+    //Sets "set-pixels-per-display-pixel-override" to 0.01 to decrease performance overhead
+    std::string temp = "echo service set-pixels-per-display-pixel-override 0.01 | \"" + ODTPath + "OculusDebugToolCLI.exe\"";
+    system(temp.c_str());
 
-	//Turn off ASW, we do not need it
-	temp = "echo server: asw.Off | \"" + ODTPath + "OculusDebugToolCLI.exe\"";
-	system(temp.c_str());
+    //Turn off ASW, we do not need it
+    temp = "echo server: asw.Off | \"" + ODTPath + "OculusDebugToolCLI.exe\"";
+    system(temp.c_str());
 }
 
 void killODT(int param) {
-	if (param != 0) {
-		//Reverse ODT cli commands
-		std::cout << "Reversing ODT CLI commands" << std::endl;
-		std::string temp = "echo service set-pixels-per-display-pixel-override 1 | \"" + ODTPath + "OculusDebugToolCLI.exe\"";
-		system(temp.c_str());
-	}
+    if (param != 0) {
+        //Reverse ODT cli commands
+        std::cout << "Reversing ODT CLI commands" << std::endl;
+        std::string temp = "echo service set-pixels-per-display-pixel-override 1 | \"" + ODTPath + "OculusDebugToolCLI.exe\"";
+        system(temp.c_str());
+    }
 
-	//Kill ODT
-	int attempts = 100;
+    //Kill ODT
+    int attempts = 100;
 
-	std::cout << "Killing ODT" << std::endl;
-	HWND hWindowHandle;
-	while ((hWindowHandle = get_winhandle((LPCWSTR)L"Oculus Debug Tool")) != NULL) {
-		forceForegroundWindow(hWindowHandle);
-		SendMessage(hWindowHandle, WM_CLOSE, 0, 0);
-		Sleep(15);
+    std::cout << "Killing ODT" << std::endl;
+    HWND hWindowHandle;
+    while ((hWindowHandle = get_winhandle((LPCWSTR)L"Oculus Debug Tool")) != NULL) {
+        forceForegroundWindow(hWindowHandle);
+        SendMessage(hWindowHandle, WM_CLOSE, 0, 0);
+        Sleep(15);
 
-		attempts--;
-		if (attempts <= 0)
-			break;
-	}
+        attempts--;
+        if (attempts <= 0)
+            break;
+    }
 
-	std::cout << "ODT Closed!" << std::endl;
+    std::cout << "ODT Closed!" << std::endl;
 }
 
-bool doKillODTThread = false;
+std::atomic<bool> doKillODTThread(false);
 
 void start_process(std::string path) {
-	if (get_winhandle((LPCWSTR)L"Oculus Debug Tool") != NULL) {
-		killODT(0);
-		Sleep(100);
-	}
+    if (get_winhandle((LPCWSTR)L"Oculus Debug Tool") != NULL) {
+        killODT(0);
+        Sleep(100);
+    }
 
-	std::string tempstr = path + "OculusDebugTool.exe";
-	std::cout << "Starting: " << tempstr << std::endl;
-	//start exe
-	ShellExecute(NULL, L"open", (LPCWSTR)std::wstring(tempstr.begin(), tempstr.end()).c_str(), NULL, NULL, SW_SHOWDEFAULT);
-	HWND hWindowHandle;
+    std::string tempstr = path + "OculusDebugTool.exe";
+    std::cout << "Starting: " << tempstr << std::endl;
+    //start exe
+    ShellExecute(NULL, L"open", (LPCWSTR)std::wstring(tempstr.begin(), tempstr.end()).c_str(), NULL, NULL, SW_SHOWDEFAULT);
+    HWND hWindowHandle;
 
-	Sleep(500);
+    Sleep(500);
 
-	//wait for window to load
-	std::cout << "Waiting for window to load" << std::endl;
-	while ((hWindowHandle = get_winhandle((LPCWSTR)L"Oculus Debug Tool")) == NULL) {
-		Sleep(100);
-	}
+    //wait for window to load
+    std::cout << "Waiting for window to load" << std::endl;
+    while ((hWindowHandle = get_winhandle((LPCWSTR)L"Oculus Debug Tool")) == NULL) {
+        Sleep(100);
+    }
 
-	// Kill the thing if user starts doing stuff
-	if (doKillODTThread) return;
+    // Kill the thing if user starts doing stuff
+    if (doKillODTThread) return;
 
-	//system("cls"); //Clear screen
-	std::cout << "ODT window found!" << std::endl;
-	HWND wxWindow = get_vxwin(hWindowHandle);
+    //system("cls"); //Clear screen
+    std::cout << "ODT window found!" << std::endl;
+    HWND wxWindow = get_vxwin(hWindowHandle);
 
-	std::cout << "Waiting for window to be focused" << std::endl;
-	while (GetForegroundWindow() != hWindowHandle) {
-		if (doKillODTThread) return;
-		forceForegroundWindow(hWindowHandle);
-		Sleep(250);
-	}
-	std::cout << "ODT window focused!" << std::endl;
+    std::cout << "Waiting for window to be focused" << std::endl;
+    while (GetForegroundWindow() != hWindowHandle) {
+        if (doKillODTThread) return;
+        forceForegroundWindow(hWindowHandle);
+        Sleep(250);
+    }
+    std::cout << "ODT window focused!" << std::endl;
 
-	// Kill the thing if user starts doing stuff
-	if (doKillODTThread) return;
+    // Kill the thing if user starts doing stuff
+    if (doKillODTThread) return;
 
-	for (int i = 0; i < 7; i++) {
-		Press_key(VK_DOWN, wxWindow);
-		std::cout << "pressed down" << std::endl;
-	}
-	Sleep(50);
-	Press_key(VK_TAB, wxWindow);
-	std::cout << "pressed tab" << std::endl;
-	Sleep(50);
+    for (int i = 0; i < 7; i++) {
+        Press_key(VK_DOWN, wxWindow);
+        std::cout << "pressed down" << std::endl;
+    }
+    Sleep(50);
+    Press_key(VK_TAB, wxWindow);
+    std::cout << "pressed tab" << std::endl;
+    Sleep(50);
 
-	// Kill the thing if user starts doing stuff
-	if (doKillODTThread) return;
+    // Kill the thing if user starts doing stuff
+    if (doKillODTThread) return;
 
-	Press_key(VK_UP, wxWindow);
-	std::cout << "pressed toggle up" << std::endl;
-	Sleep(100);
-	Press_key(VK_DOWN, wxWindow);
-	std::cout << "pressed toggle down" << std::endl;
-	Sleep(100);
+    Press_key(VK_UP, wxWindow);
+    std::cout << "pressed toggle up" << std::endl;
+    Sleep(100);
+    Press_key(VK_DOWN, wxWindow);
+    std::cout << "pressed toggle down" << std::endl;
+    Sleep(100);
 }
 
 void send_running_notification() {
@@ -262,49 +263,50 @@ void MonitorConsoleMinimize() {
 }
 
 void parse_args(int argc, char* argv[]) {
-	for (int i = 0; i < argc; i++) {
-		if (std::string(argv[i]) == "--path") {
-			ODTPath = std::string(argv[i+1]) + (argv[i+1][strlen(argv[i+1])] == '\\' ? "" : "\\"); 	// adds \ if user forgot to add it
-			ODTPath.erase(std::remove(ODTPath.begin(), ODTPath.end(), '"'), ODTPath.end()); 	// removes " from the input
-		}
-	}
+    for (int i = 0; i < argc; i++) {
+        if (std::string(argv[i]) == "--path") {
+            ODTPath = std::string(argv[i+1]) + (argv[i+1][strlen(argv[i+1])] == '\\' ? "" : "\\");  // adds \ if user forgot to add it
+            ODTPath.erase(std::remove(ODTPath.begin(), ODTPath.end(), '"'), ODTPath.end());     // removes " from the input
+        }
+    }
 }
 
-bool threadRunning;
+std::atomic<bool> threadRunning(false);
 
 void doToggle() {
-	threadRunning = true;
-	start_process(ODTPath);
-	if (!doKillODTThread) 
-		Sleep(100);
-	killODT(0);
+    threadRunning = true;
+    start_process(ODTPath);
+    if (!doKillODTThread) 
+        Sleep(100);
+    killODT(0);
 
-	threadRunning = false;
+    threadRunning = false;
 }
 
 int main(int argc, char* argv[]) {
 
-	// check for another instance
-	HANDLE hMutex = CreateMutexA(NULL, FALSE, "Local\\ODTKRA_Unique_Mutex_Name");
-	if (hMutex != NULL && GetLastError() == ERROR_ALREADY_EXISTS) {
-		std::cout << "Another instance is already running. Closing it..." << std::endl;
-		
-		HWND hExistingWnd = FindWindow(TEXT("DummyWindowClass"), TEXT("HiddenWindow"));
-		if (hExistingWnd != NULL) {
-			SendMessage(hExistingWnd, WM_COMMAND, ID_TRAY_EXIT, 0);
-		}
-		
-		CloseHandle(hMutex);
-		Sleep(1000); 
-		
-		hMutex = CreateMutexA(NULL, FALSE, "Local\\ODTKRA_Unique_Mutex_Name");
-	}
+    // check for another instance
+    HANDLE hMutex = CreateMutexA(NULL, FALSE, "Local\\ODTKRA_Unique_Mutex_Name");
+    if (hMutex != NULL && GetLastError() == ERROR_ALREADY_EXISTS) {
+        std::cout << "Another instance is already running. Closing it..." << std::endl;
+        
+        HWND hExistingWnd = FindWindow(TEXT("DummyWindowClass"), TEXT("HiddenWindow"));
+        if (hExistingWnd != NULL) {
+            SendMessage(hExistingWnd, WM_COMMAND, ID_TRAY_EXIT, 0);
+        }
+        
+        CloseHandle(hMutex);
+        Sleep(1000); 
+        
+        hMutex = CreateMutexA(NULL, FALSE, "Local\\ODTKRA_Unique_Mutex_Name");
+    }
 
-	// create a console and hide it instantly
-	AllocConsole();
-    freopen_s((FILE**)stdin, "CONIN$", "r", stdin);
-    freopen_s((FILE**)stdout, "CONOUT$", "w", stdout);
-    freopen_s((FILE**)stderr, "CONOUT$", "w", stderr);
+    // create a console and hide it instantly
+    AllocConsole();
+    FILE* fDummy;
+    freopen_s(&fDummy, "CONIN$", "r", stdin);
+    freopen_s(&fDummy, "CONOUT$", "w", stdout);
+    freopen_s(&fDummy, "CONOUT$", "w", stderr);
     
     HWND hConsole = GetConsoleWindow();
 
@@ -347,7 +349,7 @@ int main(int argc, char* argv[]) {
     nid.uID = 1;
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     nid.uCallbackMessage = WM_TRAYICON;
-	nid.uVersion = NOTIFYICON_VERSION_4;
+    nid.uVersion = NOTIFYICON_VERSION_4;
     Shell_NotifyIcon(NIM_SETVERSION, &nid);
     nid.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
     lstrcpy(nid.szTip, TEXT("ODTKRA nicolas-riera Edition"));
@@ -394,8 +396,9 @@ int main(int argc, char* argv[]) {
                 executed_at(std::to_string(refresh_tracking_times) + " Tracking refresh at: ");
 
                 // Start another thread that does the refreshing, so that we can kill it if the users does anything
-                if (createdThread)
-                    killThread.join();
+                if (createdThread) {
+                    if (killThread.joinable()) killThread.join();
+                }
 
                 killThread = std::thread(doToggle);
                 createdThread = true;
@@ -418,6 +421,16 @@ int main(int argc, char* argv[]) {
     if (createdThread && killThread.joinable()) killThread.join();
     Shell_NotifyIcon(NIM_DELETE, &nid);
     DestroyWindow(hWndHidden);
+
+    if (fDummy) {
+        fclose(stdin);
+        fclose(stdout);
+        fclose(stderr);
+    }
+
+    if (hMutex != NULL) {
+        CloseHandle(hMutex);
+    }
 
     return 0;
 }
