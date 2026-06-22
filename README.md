@@ -19,4 +19,6 @@ You can add launch options by right-clicking on a shortcut of ODTKRA.exe and goi
 
 - --path ```ODTKRA.exe --path [Oculus Diagnostics Directory]```
     - Example: ```ODTKRA.exe --path "F:\Meta Horizon\Support\oculus-diagnostics"``` \
-    <!-- Insert image -->
+    <img width="466" height="237" alt="image" src="https://github.com/user-attachments/assets/9817e90a-4242-4a26-b9fa-a79e10ec7adc" />
+
+
