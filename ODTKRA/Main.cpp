@@ -20,6 +20,7 @@ std::string ODTPath = "C:\\Program Files\\Meta Horizon\\Support\\oculus-diagnost
 NOTIFYICONDATA nid = { 0 };
 bool running = true;
 
+// system tray
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     if (uMsg == WM_TRAYICON) {
         if (lParam == WM_RBUTTONUP) {
@@ -30,6 +31,17 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
             SetForegroundWindow(hWnd);
             TrackPopupMenu(hMenu, TPM_BOTTOMALIGN | TPM_LEFTALIGN, curPoint.x, curPoint.y, 0, hWnd, NULL);
             DestroyMenu(hMenu);
+        }
+        else if (lParam == WM_LBUTTONDBLCLK) {
+            HWND hConsole = GetConsoleWindow();
+            if (IsWindowVisible(hConsole)) {
+                ShowWindow(hConsole, SW_HIDE);
+            }
+            else {
+                ShowWindow(hConsole, SW_RESTORE);
+                ShowWindow(hConsole, SW_SHOW);
+                SetForegroundWindow(hConsole);
+            }
         }
     }
     else if (uMsg == WM_COMMAND) {
@@ -230,10 +242,23 @@ void send_running_notification() {
     nid.uFlags |= NIF_INFO;
     nid.dwInfoFlags = NIIF_INFO;
     
-    lstrcpy(nid.szInfoTitle, TEXT("ODTKRA is running."));
-    lstrcpy(nid.szInfo, TEXT("You can exit it by right-clicking on the system tray icon."));
+    lstrcpy(nid.szInfoTitle, TEXT("ODTKRA is running!"));
+    lstrcpy(nid.szInfo, TEXT("You can double click on the system tray icon to show the console."));
 
     Shell_NotifyIcon(NIM_MODIFY, &nid);
+}
+
+void MonitorConsoleMinimize() {
+    HWND hConsole = GetConsoleWindow();
+    while (running) {
+        if (IsWindowVisible(hConsole)) {
+            if (IsIconic(hConsole)) {
+                ShowWindow(hConsole, SW_HIDE);
+            
+            }
+        }
+        Sleep(500);
+    }
 }
 
 void parse_args(int argc, char* argv[]) {
@@ -275,10 +300,30 @@ int main(int argc, char* argv[]) {
 		hMutex = CreateMutexA(NULL, FALSE, "Local\\ODTKRA_Unique_Mutex_Name");
 	}
 
+	// create a console and hide it instantly
+	AllocConsole();
+    freopen_s((FILE**)stdin, "CONIN$", "r", stdin);
+    freopen_s((FILE**)stdout, "CONOUT$", "w", stdout);
+    freopen_s((FILE**)stderr, "CONOUT$", "w", stderr);
+    
+    HWND hConsole = GetConsoleWindow();
+
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+    int windowWidth = 800;
+    int windowHeight = 450;
+    int posX = (screenWidth - windowWidth) / 2;
+    int posY = (screenHeight - windowHeight) / 2;
+    
+    SetWindowPos(hConsole, NULL, posX, posY, windowWidth, windowHeight, SWP_NOZORDER);
+
+    ShowWindow(hConsole, SW_HIDE);
+
+    std::thread consoleMonitor(MonitorConsoleMinimize);
+    consoleMonitor.detach();
+
     parse_args(argc, argv);
     
-    SetWindowPos(GetConsoleWindow(), 0, 900, 0, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-
     std::cout << "ODT Path: " << ODTPath << std::endl;
     ODT_CLI();
     SetConsoleTitleA("ODTKRA nicolas-riera Edition");
@@ -302,6 +347,8 @@ int main(int argc, char* argv[]) {
     nid.uID = 1;
     nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     nid.uCallbackMessage = WM_TRAYICON;
+	nid.uVersion = NOTIFYICON_VERSION_4;
+    Shell_NotifyIcon(NIM_SETVERSION, &nid);
     nid.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
     lstrcpy(nid.szTip, TEXT("ODTKRA nicolas-riera Edition"));
 
