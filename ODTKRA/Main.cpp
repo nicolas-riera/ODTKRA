@@ -1,7 +1,8 @@
 #include <iostream>
-#include <Windows.h>
+#include <windows.h>
 #include <csignal>
 #include <stdio.h>
+#include <algorithm>
 #include <psapi.h>
 #include <tlhelp32.h>
 #include <ctime>

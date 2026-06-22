@@ -1,0 +1,43 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "Compile Win32 Resources",
+            "command": "x86_64-w64-mingw32-windres",
+            "args": [
+                "${workspaceFolder}/ODTKRA/ODTKRA.rc",
+                "-o",
+                "${workspaceFolder}/ODTKRA/resources.o"
+            ],
+            "group": "build",
+            "problemMatcher": []
+        },
+        {
+            "type": "shell",
+            "label": "Build ODTKRA",
+            "command": "x86_64-w64-mingw32-g++",
+            "args": [
+                "-Os",
+                "-s",
+                "-DUNICODE",
+                "-D_UNICODE",
+                "-static",
+                "${workspaceFolder}/ODTKRA/*.cpp",
+                "${workspaceFolder}/ODTKRA/resources.o",
+                "-o",
+                "${workspaceFolder}/main.exe"
+            ],
+            "dependsOn": [
+                "Compile Win32 Resources"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": false
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        }
+    ]
+}
