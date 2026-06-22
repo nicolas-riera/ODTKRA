@@ -1,5 +1,6 @@
 #include <iostream>
 #include <windows.h>
+#include <shellapi.h>
 #include <csignal>
 #include <stdio.h>
 #include <algorithm>
@@ -9,8 +10,36 @@
 #include <iomanip>
 #include <string>
 #include <thread>
+#include "resource.h"
 
 std::string ODTPath = "C:\\Program Files\\Meta Horizon\\Support\\oculus-diagnostics\\";
+
+#define WM_TRAYICON (WM_USER + 1)
+#define ID_TRAY_EXIT 1001
+
+NOTIFYICONDATA nid = { 0 };
+bool running = true;
+
+LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+    if (uMsg == WM_TRAYICON) {
+        if (lParam == WM_RBUTTONUP) {
+            POINT curPoint;
+            GetCursorPos(&curPoint);
+            HMENU hMenu = CreatePopupMenu();
+            AppendMenu(hMenu, MF_STRING, ID_TRAY_EXIT, TEXT("Exit"));
+            SetForegroundWindow(hWnd);
+            TrackPopupMenu(hMenu, TPM_BOTTOMALIGN | TPM_LEFTALIGN, curPoint.x, curPoint.y, 0, hWnd, NULL);
+            DestroyMenu(hMenu);
+        }
+    }
+    else if (uMsg == WM_COMMAND) {
+        if (LOWORD(wParam) == ID_TRAY_EXIT) {
+            running = false;
+            PostQuitMessage(0);
+        }
+    }
+    return DefWindowProc(hWnd, uMsg, wParam, lParam);
+}
 
 int get_pid(const std::wstring& processName) {
 	int pid = 0;
@@ -197,6 +226,16 @@ void start_process(std::string path) {
 	Sleep(100);
 }
 
+void send_running_notification() {
+    nid.uFlags |= NIF_INFO;
+    nid.dwInfoFlags = NIIF_INFO;
+    
+    lstrcpy(nid.szInfoTitle, TEXT("ODTKRA is running."));
+    lstrcpy(nid.szInfo, TEXT("You can exit it by right-clicking on the system tray icon."));
+
+    Shell_NotifyIcon(NIM_MODIFY, &nid);
+}
+
 void parse_args(int argc, char* argv[]) {
 	for (int i = 0; i < argc; i++) {
 		if (std::string(argv[i]) == "--path") {
@@ -219,71 +258,119 @@ void doToggle() {
 }
 
 int main(int argc, char* argv[]) {
-	parse_args(argc, argv);
-	
-	SetWindowPos(GetConsoleWindow(), 0, 900, 0, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
 
-	std::cout << "ODT Path: " << ODTPath << std::endl;
-	ODT_CLI();
-	SetConsoleTitleA("ODTKRA nicolas-riera Edition");
-
-	signal(SIGABRT, killODT);
-	signal(SIGTERM, killODT);
-	signal(SIGBREAK, killODT);
-
-	ULONGLONG tracking_refresh_timer = GetTickCount64();
-	ULONGLONG refresh_loop = tracking_refresh_timer;
-	ULONGLONG lastIdle = GetTickCount64();
-
-
-	int refresh_tracking = 9; 	//refresh tracking every X minutes
-	int refresh_tracking_times = 0;
-	bool createdThread = false;
-	std::thread killThread;
-
-	POINT lastCursor;
-	GetCursorPos(&lastCursor);
-	while (true) {
-		auto tk = GetTickCount64();
-
-		POINT p;
-		GetCursorPos(&p);
-		// Check if mouse moved
-		if (p.x != lastCursor.x || p.y != lastCursor.y)
-			lastIdle = tk;
-		lastCursor = p;
-
-		if (tk - lastIdle < seconds(15))
-		{
-			if (threadRunning) {
-				doKillODTThread = true;
-				refresh_loop = tk;
-			}
-		}
-		else
-		{
-			doKillODTThread = false;
+	// check for another instance
+	HANDLE hMutex = CreateMutexA(NULL, FALSE, "Local\\ODTKRA_Unique_Mutex_Name");
+	if (hMutex != NULL && GetLastError() == ERROR_ALREADY_EXISTS) {
+		std::cout << "Another instance is already running. Closing it..." << std::endl;
+		
+		HWND hExistingWnd = FindWindow(TEXT("DummyWindowClass"), TEXT("HiddenWindow"));
+		if (hExistingWnd != NULL) {
+			SendMessage(hExistingWnd, WM_COMMAND, ID_TRAY_EXIT, 0);
 		}
 		
-
-		if (tk >= refresh_loop && tk - lastIdle > seconds(15)) {
-			refresh_tracking_times++;
-			executed_at(std::to_string(refresh_tracking_times) + " Tracking refresh at: ");
-
-
-			// Start another thread that does the refreshing, so that we can kill it if the users does anything
-			if (createdThread)
-				killThread.join();
-
-			killThread = std::thread(doToggle);
-			createdThread = true;
-
-			refresh_loop = tk + minutes(refresh_tracking);
-			std::cout << "next tk: " << refresh_loop << std::endl;
-		}
-
-
-		Sleep(100);
+		CloseHandle(hMutex);
+		Sleep(1000); 
+		
+		hMutex = CreateMutexA(NULL, FALSE, "Local\\ODTKRA_Unique_Mutex_Name");
 	}
-	return 0;
+
+    parse_args(argc, argv);
+    
+    SetWindowPos(GetConsoleWindow(), 0, 900, 0, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+
+    std::cout << "ODT Path: " << ODTPath << std::endl;
+    ODT_CLI();
+    SetConsoleTitleA("ODTKRA nicolas-riera Edition");
+
+    signal(SIGABRT, killODT);
+    signal(SIGTERM, killODT);
+    signal(SIGBREAK, killODT);
+
+    HINSTANCE hInstance = GetModuleHandle(NULL);
+    WNDCLASS wc = { 0 };
+    wc.lpfnWndProc = WindowProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = TEXT("DummyWindowClass");
+    RegisterClass(&wc);
+
+    HWND hWndHidden = CreateWindowEx(0, TEXT("DummyWindowClass"), TEXT("HiddenWindow"), 
+                                     0, 0, 0, 0, 0, HWND_MESSAGE, NULL, hInstance, NULL);
+
+    nid.cbSize = sizeof(NOTIFYICONDATA);
+    nid.hWnd = hWndHidden;
+    nid.uID = 1;
+    nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
+    nid.uCallbackMessage = WM_TRAYICON;
+    nid.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON1));
+    lstrcpy(nid.szTip, TEXT("ODTKRA nicolas-riera Edition"));
+
+    Shell_NotifyIcon(NIM_ADD, &nid);
+
+    ULONGLONG tracking_refresh_timer = GetTickCount64();
+    ULONGLONG refresh_loop = tracking_refresh_timer;
+    ULONGLONG lastIdle = GetTickCount64();
+
+    int refresh_tracking = 9;   //refresh tracking every X minutes
+    int refresh_tracking_times = 0;
+    bool createdThread = false;
+    std::thread killThread;
+
+    POINT lastCursor;
+    GetCursorPos(&lastCursor);
+
+    std::thread worker([&]() {
+        send_running_notification();
+
+        while (running) {
+            auto tk = GetTickCount64();
+
+            POINT p;
+            GetCursorPos(&p);
+            // Check if mouse moved
+            if (p.x != lastCursor.x || p.y != lastCursor.y)
+                lastIdle = tk;
+            lastCursor = p;
+
+            if (tk - lastIdle < seconds(15)) {
+                if (threadRunning) {
+                    doKillODTThread = true;
+                    refresh_loop = tk;
+                }
+            }
+            else {
+                doKillODTThread = false;
+            }
+            
+            if (tk >= refresh_loop && tk - lastIdle > seconds(15)) {
+                refresh_tracking_times++;
+                executed_at(std::to_string(refresh_tracking_times) + " Tracking refresh at: ");
+
+                // Start another thread that does the refreshing, so that we can kill it if the users does anything
+                if (createdThread)
+                    killThread.join();
+
+                killThread = std::thread(doToggle);
+                createdThread = true;
+
+                refresh_loop = tk + minutes(refresh_tracking);
+                std::cout << "next tk: " << refresh_loop << std::endl;
+            }
+
+            Sleep(100);
+        }
+    });
+
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    if (worker.joinable()) worker.join();
+    if (createdThread && killThread.joinable()) killThread.join();
+    Shell_NotifyIcon(NIM_DELETE, &nid);
+    DestroyWindow(hWndHidden);
+
+    return 0;
 }

@@ -6,7 +6,11 @@
             "label": "Compile Win32 Resources",
             "command": "x86_64-w64-mingw32-windres",
             "args": [
+                "-I",
+                "${workspaceFolder}/ODTKRA",
                 "${workspaceFolder}/ODTKRA/ODTKRA.rc",
+                "-O",
+                "coff",
                 "-o",
                 "${workspaceFolder}/ODTKRA/resources.o"
             ],
@@ -26,7 +30,7 @@
                 "${workspaceFolder}/ODTKRA/*.cpp",
                 "${workspaceFolder}/ODTKRA/resources.o",
                 "-o",
-                "${workspaceFolder}/main.exe",
+                "${workspaceFolder}/ODTKRA.exe",
                 "-mwindows"
             ],
             "dependsOn": [
@@ -34,7 +38,7 @@
             ],
             "group": {
                 "kind": "build",
-                "isDefault": false
+                "isDefault": true
             },
             "problemMatcher": [
                 "$gcc"
