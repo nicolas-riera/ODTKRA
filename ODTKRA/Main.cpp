@@ -225,7 +225,7 @@ int main(int argc, char* argv[]) {
 
 	std::cout << "ODT Path: " << ODTPath << std::endl;
 	ODT_CLI();
-	SetConsoleTitleA("ODTKRA Memory Leak Edition");
+	SetConsoleTitleA("ODTKRA nicolas-riera Edition");
 
 	signal(SIGABRT, killODT);
 	signal(SIGTERM, killODT);

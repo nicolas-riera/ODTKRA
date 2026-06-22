@@ -26,7 +26,8 @@
                 "${workspaceFolder}/ODTKRA/*.cpp",
                 "${workspaceFolder}/ODTKRA/resources.o",
                 "-o",
-                "${workspaceFolder}/main.exe"
+                "${workspaceFolder}/main.exe",
+                "-mwindows"
             ],
             "dependsOn": [
                 "Compile Win32 Resources"
