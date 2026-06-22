@@ -9,7 +9,7 @@
 #include <string>
 #include <thread>
 
-std::string ODTPath = "C:\\Program Files\\Oculus\\Support\\oculus-diagnostics\\";
+std::string ODTPath = "C:\\Program Files\\Meta Horizon\\Support\\oculus-diagnostics\\";
 
 int get_pid(const std::wstring& processName) {
 	int pid = 0;
