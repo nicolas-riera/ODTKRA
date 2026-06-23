@@ -94,6 +94,7 @@ bool is24HourFormat() {
 
     if (result > 0) {
         std::wstring formatStr(timeFormat);
+        // "H" means 24h format, "h" means 12h format
         if (formatStr.find(L"H") != std::wstring::npos) {
             return true;
         }
@@ -344,6 +345,7 @@ int main(int argc, char* argv[]) {
     std::thread consoleMonitor(MonitorConsoleMinimize);
     consoleMonitor.detach();
 
+    // Check launch arguments
     parse_args(argc, argv);
     
     std::cout << "ODT Path: " << ODTPath << std::endl;
