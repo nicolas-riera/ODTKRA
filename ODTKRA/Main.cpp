@@ -11,8 +11,10 @@
 #include <string>
 #include <thread>
 #include <atomic>
+#include <filesystem>
 #include "resource.h"
 
+// Default path
 std::string ODTPath = "C:\\Program Files\\Meta Horizon\\Support\\oculus-diagnostics\\";
 
 #define WM_TRAYICON (WM_USER + 1)
@@ -80,6 +82,21 @@ int get_pid(const std::wstring& processName) {
 
     CloseHandle(hSnapshot);
     return pid;
+}
+
+bool fileExists(const std::string& filePath) {
+    return std::filesystem::exists(filePath) && std::filesystem::is_regular_file(filePath);
+}
+
+bool checkODTPath() {
+    std::string ODTCLI_path = ODTPath + "OculusDebugToolCLI.exe\"";
+    std::string ODTGUI_path = ODTPath + "OculusDebugTool.exe\"";
+
+    if (fileExists(ODTCLI_path) && fileExists(ODTGUI_path)) {
+        return true;
+    }
+
+    return false;
 }
 
 bool is24HourFormat() {
@@ -240,6 +257,7 @@ void start_process(std::string path) {
     // Kill the thing if user starts doing stuff
     if (doKillODTThread) return;
 
+    // Go to the option "Bypass Proximity Sensor Check""
     for (int i = 0; i < 7; i++) {
         Press_key(VK_DOWN, wxWindow);
         std::cout << "pressed down" << std::endl;
@@ -252,6 +270,7 @@ void start_process(std::string path) {
     // Kill the thing if user starts doing stuff
     if (doKillODTThread) return;
 
+    // Toogle the option "Bypass Proximity Sensor Check"
     Press_key(VK_UP, wxWindow);
     std::cout << "pressed toggle up" << std::endl;
     Sleep(100);
@@ -260,12 +279,12 @@ void start_process(std::string path) {
     Sleep(100);
 }
 
-void send_running_notification() {
+void send_notification(std::wstring infoTitle, std::wstring info) {
     nid.uFlags |= NIF_INFO;
     nid.dwInfoFlags = NIIF_INFO;
     
-    lstrcpy(nid.szInfoTitle, TEXT("ODTKRA is running!"));
-    lstrcpy(nid.szInfo, TEXT("You can double click on the system tray icon to show the console."));
+    lstrcpyW(nid.szInfoTitle, infoTitle.c_str());
+    lstrcpyW(nid.szInfo, info.c_str());
 
     Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
@@ -349,7 +368,7 @@ int main(int argc, char* argv[]) {
     parse_args(argc, argv);
     
     std::cout << "ODT Path: " << ODTPath << std::endl;
-    ODT_CLI();
+
     SetConsoleTitleA("ODTKRA nicolas-riera Edition");
 
     signal(SIGABRT, killODT);
@@ -391,7 +410,18 @@ int main(int argc, char* argv[]) {
     GetCursorPos(&lastCursor);
 
     std::thread worker([&]() {
-        send_running_notification();
+
+        // Check path, and close the program if ODT isn't found
+        if (!checkODTPath()) {
+            send_notification(L"Oculus Diagnostic Tool not found.", L"Unable to find ODT at " + std::wstring(ODTPath.begin(), ODTPath.end()) + L". Make sure you have the program installed or change the path.");
+            Sleep(5000);
+            ExitProcess(1);
+        }
+
+        send_notification(L"ODTKRA is running!", L"You can double click on the system tray icon to show the console.");
+        
+        // Disable ASW and set "set-pixels-per-display-pixel-override" to 0.01
+        ODT_CLI();
 
         while (running) {
             auto tk = GetTickCount64();
