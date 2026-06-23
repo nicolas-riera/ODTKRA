@@ -195,7 +195,8 @@ void killODT(int param) {
     if (param != 0) {
         //Reverse ODT cli commands
         std::cout << "Reversing ODT CLI commands" << std::endl;
-        std::string temp = "echo service set-pixels-per-display-pixel-override 1 | \"" + ODTPath + "OculusDebugToolCLI.exe\"";
+        std::string temp = "echo service set-pixels-per-display-pixel-override 0 | \"" + ODTPath + "OculusDebugToolCLI.exe\"";
+        // ASW stays disabled, but honestly that's better for everyone
         system(temp.c_str());
     }
 
@@ -204,14 +205,12 @@ void killODT(int param) {
 
     std::cout << "Killing ODT" << std::endl;
     HWND hWindowHandle;
-    while ((hWindowHandle = get_winhandle((LPCWSTR)L"Oculus Debug Tool")) != NULL) {
+    while ((hWindowHandle = get_winhandle((LPCWSTR)L"Oculus Debug Tool")) != NULL || attempts <= 0) {
         forceForegroundWindow(hWindowHandle);
         SendMessage(hWindowHandle, WM_CLOSE, 0, 0);
         Sleep(15);
 
         attempts--;
-        if (attempts <= 0)
-            break;
     }
 
     std::cout << "ODT Closed!" << std::endl;
@@ -468,6 +467,8 @@ int main(int argc, char* argv[]) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
+
+    killODT(1);
 
     if (worker.joinable()) worker.join();
     if (createdThread && killThread.joinable()) killThread.join();
