@@ -1,5 +1,5 @@
 # Oculus Debug Tool Keep Rift Alive / ODTKRA
-Uses the Oculus Debug Tool to keep your rift from going to sleep
+Uses the Oculus Debug Tool to keep your Oculus Rift from going to sleep
 
 This is a fork aimed to fix bugs and bring improvements to the tool.
 

@@ -31,7 +31,7 @@
                 "${workspaceFolder}/ODTKRA/resources.o",
                 "-o",
                 "${workspaceFolder}/ODTKRA.exe",
-                "-mwindows"
+                "-mwindows" // Disable the original console, we have ours
             ],
             "dependsOn": [
                 "Compile Win32 Resources"

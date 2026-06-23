@@ -149,6 +149,32 @@ void executed_at(std::string message = "Executed at: ") {
     std::cout << message << std::put_time(&time, "%H:%M:%S") << std::endl;
 }
 
+void next_tk(ULONGLONG refresh_loop) {
+    ULONGLONG current_tk = GetTickCount64();
+    long long diff_ms = static_cast<long long>(refresh_loop) - static_cast<long long>(current_tk);
+    
+    if (diff_ms < 0) diff_ms = 0;
+
+    time_t raw_next = time(0) + (diff_ms / 1000);
+
+    tm ltm_next;
+    localtime_s(&ltm_next, &raw_next);
+
+    if (!is24HourFormat()) {
+        if (ltm_next.tm_hour > 12) {
+            ltm_next.tm_hour -= 12;
+        }
+        else if (ltm_next.tm_hour == 0) {
+            ltm_next.tm_hour = 12;
+        }
+    }
+
+    std::stringstream ss; // Avoid issue where something is cout-ting at the same time
+    ss << "Next tracking refresh : " << std::put_time(&ltm_next, "%H:%M:%S") << "\n";
+    std::cout << ss.str();
+       
+}
+
 HWND get_winhandle(LPCWSTR Target_window_Name) {
     HWND hWindowHandle = FindWindow(NULL, Target_window_Name);
     return hWindowHandle;
@@ -182,12 +208,15 @@ void Press_key(int key, HWND wxWindow) {
 }
 
 void ODT_CLI() {
+
     //Sets "set-pixels-per-display-pixel-override" to 0.01 to decrease performance overhead
-    std::string temp = "echo service set-pixels-per-display-pixel-override 0.01 | \"" + ODTPath + "OculusDebugToolCLI.exe\"";
+    std::cout << "Setting 'set-pixels-per-display-pixel-override' to 0.01..." << std::endl;
+    std::string temp = "(echo service set-pixels-per-display-pixel-override 0.01 & echo exit) | \"" + ODTPath + "OculusDebugToolCLI.exe\"";
     system(temp.c_str());
 
     //Turn off ASW, we do not need it
-    temp = "echo server: asw.Off | \"" + ODTPath + "OculusDebugToolCLI.exe\"";
+    std::cout << "Disabing ASW..." << std::endl;
+    temp = "(echo server: asw.Off & echo exit) | \"" + ODTPath + "OculusDebugToolCLI.exe\"";
     system(temp.c_str());
 }
 
@@ -256,14 +285,18 @@ void start_process(std::string path) {
     // Kill the thing if user starts doing stuff
     if (doKillODTThread) return;
 
-    // Go to the option "Bypass Proximity Sensor Check""
+    std::cout << "Going to 'Bypass Proximity Sensor Check'..." << std::endl;
+
+    // Go to the setting "Bypass Proximity Sensor Check"
     for (int i = 0; i < 7; i++) {
         Press_key(VK_DOWN, wxWindow);
-        std::cout << "pressed down" << std::endl;
+        std::cout << "Pressed Arrow Down" << std::endl;
     }
     Sleep(50);
+
+    std::cout << "Refreshing the setting..." << std::endl;
     Press_key(VK_TAB, wxWindow);
-    std::cout << "pressed tab" << std::endl;
+    std::cout << "Pressed Tab" << std::endl;
     Sleep(50);
 
     // Kill the thing if user starts doing stuff
@@ -271,11 +304,13 @@ void start_process(std::string path) {
 
     // Toogle the option "Bypass Proximity Sensor Check"
     Press_key(VK_UP, wxWindow);
-    std::cout << "pressed toggle up" << std::endl;
+    std::cout << "Set the option to 'Off'" << std::endl;
     Sleep(100);
     Press_key(VK_DOWN, wxWindow);
-    std::cout << "pressed toggle down" << std::endl;
+    std::cout << "Set the option to 'On'" << std::endl;
     Sleep(100);
+
+    std::cout << "Done!" << std::endl;
 }
 
 void send_notification(std::wstring infoTitle, std::wstring info) {
@@ -288,6 +323,7 @@ void send_notification(std::wstring infoTitle, std::wstring info) {
     Shell_NotifyIcon(NIM_MODIFY, &nid);
 }
 
+// Hiding the app into the system tray when minimizing the console window
 void MonitorConsoleMinimize() {
     HWND hConsole = GetConsoleWindow();
     while (running) {
@@ -444,7 +480,7 @@ int main(int argc, char* argv[]) {
             
             if (tk >= refresh_loop && tk - lastIdle > seconds(15)) {
                 refresh_tracking_times++;
-                executed_at(std::to_string(refresh_tracking_times) + " Tracking refresh at: ");
+                executed_at("Tracking refresh #" + std::to_string(refresh_tracking_times) + " executed at : ");
 
                 // Start another thread that does the refreshing, so that we can kill it if the users does anything
                 if (createdThread) {
@@ -455,7 +491,7 @@ int main(int argc, char* argv[]) {
                 createdThread = true;
 
                 refresh_loop = tk + minutes(refresh_tracking);
-                std::cout << "next tk: " << refresh_loop << std::endl;
+                next_tk(refresh_loop);
             }
 
             Sleep(100);
