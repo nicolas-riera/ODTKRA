@@ -82,11 +82,31 @@ int get_pid(const std::wstring& processName) {
     return pid;
 }
 
-tm time_now(bool twelve_hour = true) {
+bool is24HourFormat() {
+    wchar_t timeFormat[80];
+    
+    int result = GetLocaleInfoEx(
+        LOCALE_NAME_USER_DEFAULT, 
+        LOCALE_STIMEFORMAT, 
+        timeFormat, 
+        80
+    );
+
+    if (result > 0) {
+        std::wstring formatStr(timeFormat);
+        if (formatStr.find(L"H") != std::wstring::npos) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
+tm time_now() {
     time_t now = time(0);
     tm ltm;
     localtime_s(&ltm, &now);
-    if (twelve_hour == true) {
+    if (!is24HourFormat()) {
         //convert to 12 hour format
         if (ltm.tm_hour > 12) {
             ltm.tm_hour -= 12;
