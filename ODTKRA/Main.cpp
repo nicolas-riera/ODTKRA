@@ -448,8 +448,14 @@ int main(int argc, char* argv[]) {
 
         // Check path, and close the program if ODT isn't found
         if (!checkODTPath()) {
-            send_notification(L"Oculus Diagnostic Tool not found.", L"Unable to find ODT at " + std::wstring(ODTPath.begin(), ODTPath.end()) + L". Make sure you have the program installed or change the path.");
-            Sleep(5000);
+            std::wstring message = L"Oculus Diagnostic Tool not found.";
+            std::wstring titre = L"Unable to find ODT at " + std::wstring(ODTPath.begin(), ODTPath.end()) + L". Make sure you have the program installed or change the path with the launch argument '--path'.";
+            MessageBox(
+                NULL,
+                titre.c_str(),
+                message.c_str(),
+                MB_OK | MB_ICONERROR
+            );
             ExitProcess(1);
         }
 
