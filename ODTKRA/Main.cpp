@@ -438,11 +438,13 @@ int main(int argc, char* argv[]) {
 
     int refresh_tracking = 9;   //refresh tracking every X minutes
     int refresh_tracking_times = 0;
-    bool mouseMovedThisCycle = false;
+    bool userActiveThisCycle = false;
     bool forcedActive = false;
 
-    POINT lastCursor;
-    GetCursorPos(&lastCursor);
+    // Last input tracking structure
+    LASTINPUTINFO lii = { 0 };
+    lii.cbSize = sizeof(LASTINPUTINFO);
+    DWORD lastInputTime = 0;
 
     std::thread worker([&]() {
 
@@ -464,17 +466,22 @@ int main(int argc, char* argv[]) {
         // Disable ASW and set "set-pixels-per-display-pixel-override" to 0.01
         ODT_CLI();
 
+        // Initialize the last input time before entering the loop
+        if (GetLastInputInfo(&lii)) {
+            lastInputTime = lii.dwTime;
+        }
+
         while (running) {
             auto tk = GetTickCount64();
 
-            POINT p;
-            GetCursorPos(&p);
-            
-            if (p.x != lastCursor.x || p.y != lastCursor.y) {
-                lastIdle = tk;
-                mouseMovedThisCycle = true; // Track that the mouse moved during this 9-minute window
+            // Track any system-wide input
+            if (GetLastInputInfo(&lii)) {
+                if (lii.dwTime != lastInputTime) {
+                    lastIdle = tk;
+                    lastInputTime = lii.dwTime;
+                    userActiveThisCycle = true; // User interacted during this 9-minute window
+                }
             }
-            lastCursor = p;
 
             // Reset forcedActive when the thread is done
             if (forcedActive && !threadRunning) {
@@ -494,7 +501,7 @@ int main(int argc, char* argv[]) {
             // Anticipated refresh
             bool refreshIsSoon = (refresh_loop > tk && (refresh_loop - tk) <= minutes(5));
             bool inactiveForOneMinute = (tk - lastIdle >= minutes(1));
-            bool anticipateRefresh = refreshIsSoon && inactiveForOneMinute && mouseMovedThisCycle;
+            bool anticipateRefresh = refreshIsSoon && inactiveForOneMinute && userActiveThisCycle;
 
             // Force refresh to not go over the 10 minutes mark
             bool forceRefresh = (tk >= refresh_loop + minutes(1));
@@ -521,7 +528,7 @@ int main(int argc, char* argv[]) {
                 std::thread killThread(doToggle);
                 killThread.detach();
 
-                mouseMovedThisCycle = false;
+                userActiveThisCycle = false;
 
                 // Reschedule the next execution from this exact moment
                 refresh_loop = tk + minutes(refresh_tracking);
