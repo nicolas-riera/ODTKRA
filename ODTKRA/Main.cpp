@@ -99,6 +99,31 @@ bool checkODTPath() {
     return false;
 }
 
+bool isOculusServiceRunning() {
+    bool isRunning = false;
+
+    SC_HANDLE hSCM = OpenSCManager(NULL, NULL, SC_MANAGER_CONNECT);
+    if (hSCM == NULL) {
+        return false;
+    }
+
+    SC_HANDLE hService = OpenService(hSCM, L"OVRService", SERVICE_QUERY_STATUS);
+    if (hService != NULL) {
+        SERVICE_STATUS_PROCESS ssp;
+        DWORD bytesNeeded;
+
+        if (QueryServiceStatusEx(hService, SC_STATUS_PROCESS_INFO, (LPBYTE)&ssp, sizeof(ssp), &bytesNeeded)) {
+            if (ssp.dwCurrentState == SERVICE_RUNNING) {
+                isRunning = true;
+            }
+        }
+        CloseServiceHandle(hService);
+    }
+
+    CloseServiceHandle(hSCM);
+    return isRunning;
+}
+
 bool is24HourFormat() {
     wchar_t timeFormat[80];
     
@@ -456,6 +481,16 @@ int main(int argc, char* argv[]) {
         if (!checkODTPath()) {
             std::wstring message = L"Oculus Diagnostic Tool not found.";
             std::wstring titre = L"Unable to find ODT at " + std::wstring(ODTPath.begin(), ODTPath.end()) + L". Make sure you have the program installed or change the path with the launch argument '--path'.";
+            MessageBox(
+                NULL,
+                titre.c_str(),
+                message.c_str(),
+                MB_OK | MB_ICONERROR
+            );
+            ExitProcess(1);
+        } else if (!isOculusServiceRunning()) {
+            std::wstring message = L"OVRService not running.";
+            std::wstring titre = L"OVRService is not running. Make sure the Oculus VR Runtime Service is started in the Windows Services manager before launching ODTKRA.";
             MessageBox(
                 NULL,
                 titre.c_str(),
