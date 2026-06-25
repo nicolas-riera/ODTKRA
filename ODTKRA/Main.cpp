@@ -263,7 +263,7 @@ void start_process(std::string path) {
 
     //wait for window to load
     std::cout << "Waiting for window to load" << std::endl;
-    while ((hWindowHandle = get_winhandle((LPCWSTR)L"Oculus Debug Tool")) == NULL) {
+    while ((hWindowHandle = get_winhandle((LPCWSTR)L"Oculus Debug Tool")) == NULL && !doKillODTThread) {
         Sleep(100);
     }
 
@@ -275,7 +275,7 @@ void start_process(std::string path) {
     HWND wxWindow = get_vxwin(hWindowHandle);
 
     std::cout << "Waiting for window to be focused" << std::endl;
-    while (GetForegroundWindow() != hWindowHandle) {
+    while (GetForegroundWindow() != hWindowHandle && !doKillODTThread) {
         if (doKillODTThread) return;
         forceForegroundWindow(hWindowHandle);
         Sleep(250);
@@ -438,8 +438,8 @@ int main(int argc, char* argv[]) {
 
     int refresh_tracking = 9;   //refresh tracking every X minutes
     int refresh_tracking_times = 0;
-    bool createdThread = false;
-    std::thread killThread;
+    bool mouseMovedThisCycle = false;
+    bool forcedActive = false;
 
     POINT lastCursor;
     GetCursorPos(&lastCursor);
@@ -469,38 +469,66 @@ int main(int argc, char* argv[]) {
 
             POINT p;
             GetCursorPos(&p);
-            // Check if mouse moved
-            if (p.x != lastCursor.x || p.y != lastCursor.y)
+            
+            if (p.x != lastCursor.x || p.y != lastCursor.y) {
                 lastIdle = tk;
+                mouseMovedThisCycle = true; // Track that the mouse moved during this 9-minute window
+            }
             lastCursor = p;
 
+            // Reset forcedActive when the thread is done
+            if (forcedActive && !threadRunning) {
+                forcedActive = false; 
+            }
+
             if (tk - lastIdle < seconds(15)) {
-                if (threadRunning) {
+                // Do not trigger a kill if the activation was forced
+                if (!forcedActive) {
                     doKillODTThread = true;
-                    refresh_loop = tk;
                 }
             }
             else {
                 doKillODTThread = false;
             }
-            
-            if (tk >= refresh_loop && tk - lastIdle > seconds(15)) {
-                refresh_tracking_times++;
-                executed_at("Tracking refresh #" + std::to_string(refresh_tracking_times) + " executed at : ");
 
-                // Start another thread that does the refreshing, so that we can kill it if the users does anything
-                if (createdThread) {
-                    if (killThread.joinable()) killThread.join();
+            // Anticipated refresh
+            bool refreshIsSoon = (refresh_loop > tk && (refresh_loop - tk) <= minutes(5));
+            bool inactiveForOneMinute = (tk - lastIdle >= minutes(1));
+            bool anticipateRefresh = refreshIsSoon && inactiveForOneMinute && mouseMovedThisCycle;
+
+            // Force refresh to not go over the 10 minutes mark
+            bool forceRefresh = (tk >= refresh_loop + minutes(1));
+
+            // Global trigger conditions
+            if ((tk >= refresh_loop && tk - lastIdle > seconds(15)) || anticipateRefresh || forceRefresh) {
+                
+                // If the refresh is forced, temporarily disable the kill signal to let the thread work for 3 seconds
+                if (forceRefresh) {
+                    forcedActive = true;
+                    doKillODTThread = false;
                 }
 
-                killThread = std::thread(doToggle);
-                createdThread = true;
+                refresh_tracking_times++;
+                
+                if (forceRefresh) {
+                    executed_at("Tracking refresh #" + std::to_string(refresh_tracking_times) + " FORCED (Safety timeout) at : ");
+                } else if (anticipateRefresh) {
+                    executed_at("Tracking refresh #" + std::to_string(refresh_tracking_times) + " executed EARLY (Anticipation) at : ");
+                } else {
+                    executed_at("Tracking refresh #" + std::to_string(refresh_tracking_times) + " executed at : ");
+                }
 
+                std::thread killThread(doToggle);
+                killThread.detach();
+
+                mouseMovedThisCycle = false;
+
+                // Reschedule the next execution from this exact moment
                 refresh_loop = tk + minutes(refresh_tracking);
                 next_tk(refresh_loop);
             }
 
-            Sleep(100);
+            Sleep(250);
         }
     });
 
@@ -513,7 +541,6 @@ int main(int argc, char* argv[]) {
     killODT(1);
 
     if (worker.joinable()) worker.join();
-    if (createdThread && killThread.joinable()) killThread.join();
     Shell_NotifyIcon(NIM_DELETE, &nid);
     DestroyWindow(hWndHidden);
 
